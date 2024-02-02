@@ -31,7 +31,7 @@ impl Hash for String {
 }
 
 impl<K: Default + Clone + Hash + Debug + PartialEq, V: Default + Clone + Debug> HashTable<K, V> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         // capacity is a prime number to reduce collisions
         const CONTAINER_CAPACITY: usize = 5;
         Self {
@@ -40,9 +40,16 @@ impl<K: Default + Clone + Hash + Debug + PartialEq, V: Default + Clone + Debug> 
         }
     }
 
-    fn extend(&mut self) {}
+    fn extend(&mut self) {
+        
+    }
 
-    fn insert(&mut self, key: K, value: V) -> Option<V> {
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+        if self.cells_in_use_count == self.container.len() {
+            self.extend();
+        }
+        assert!(self.cells_in_use_count < self.container.len());
+
         if let Some(old_value) = self.get_mut(&key) {
             Some(std::mem::replace(old_value, value))
         } else {
@@ -62,30 +69,32 @@ impl<K: Default + Clone + Hash + Debug + PartialEq, V: Default + Clone + Debug> 
         }
     }
 
-    fn get(&self, key: &K) -> Option<&V> {
-        let index = key.hash() % self.container.len();
-        if self.container[index].in_use {
-            Some(&self.container[index].value)
+    fn get_index(&self, key: &K) -> Option<usize> {
+        let mut index = key.hash() % self.container.len();
+        for _i in 0..self.container.len() {
+            if !self.container[index].in_use {
+                break;
+            }
+            if self.container[index].key == *key {
+                break;
+            }
+            index = (index + 1) % self.container.len();
+        }
+        if self.container[index].in_use && self.container[index].key == *key {
+            Some(index)
         } else {
             None
         }
     }
 
-    fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        if self.cells_in_use_count == self.container.len() {
-            self.extend();
-        }
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.get_index(key)
+            .map(|index| &self.container[index].value)
+    }
 
-        assert!(self.cells_in_use_count < self.container.len());
-        let mut index = key.hash() % self.container.len();
-        while self.container[index].in_use && self.container[index].key != *key {
-            index = (index + 1) % self.container.len();
-        }
-        if self.container[index].in_use {
-            Some(&mut self.container[index].value)
-        } else {
-            None
-        }
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        self.get_index(key)
+            .map(|index| &mut self.container[index].value)
     }
 
     //print information about the container
@@ -101,7 +110,7 @@ impl<K: Default + Clone + Hash + Debug + PartialEq, V: Default + Clone + Debug> 
 }
 
 fn main() {
-    let mut ht = HashTable::<String, String>::new();
+    let mut ht: HashTable<String, String> = HashTable::<String, String>::new();
     ht.insert("Hello".to_string(), "world".to_string());
     ht.insert("test".to_string(), "1234".to_string());
     let res = ht.insert("Hello".to_string(), "12345".to_string());
